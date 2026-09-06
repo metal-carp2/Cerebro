@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "NeuroFlow Studio",
+    "slug": "neuroflow-studio",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.neuroflow.studio",
+      "permissions": ["BLUETOOTH_SCAN", "BLUETOOTH_CONNECT", "ACCESS_FINE_LOCATION"]
+    },
+    "web": { "bundler": "metro" }
+  }
+}

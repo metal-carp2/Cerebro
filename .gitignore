@@ -1,0 +1,6 @@
+
+# NeuroFlow
+neuroflow-studio/node_modules/
+neuroflow-studio/.expo/
+neuroflow-studio/dist/
+neuroflow-studio/companion/__pycache__/
