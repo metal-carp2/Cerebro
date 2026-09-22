@@ -1,5 +1,11 @@
 
 # NeuroFlow
+.venv/
+__pycache__/
+*.pyc
+data/
+reports/
+neuroflow-studio/.test-build/
 neuroflow-studio/node_modules/
 neuroflow-studio/.expo/
 neuroflow-studio/dist/

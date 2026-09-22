@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReplayScreen from './src/ReplayScreen';
 import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,8 +14,8 @@ import { checkCompanion, CompanionStatus, ComputeMode, inferRemote, RemotePredic
 import { catalogBoards, nativeBrainFlowAvailable } from './src/headsets';
 import { Board, EventMarker, ModelDefinition, OperatorState, ParadigmId, PipelineConfig, PreprocessConfig, Sample, Session } from './src/types';
 
-type Tab = 'Monitor' | 'Operator' | 'Paradigms' | 'Connect' | 'Compute' | 'Models' | 'Sessions' | 'Settings';
-const tabs: Tab[] = ['Monitor', 'Operator', 'Paradigms', 'Connect', 'Compute', 'Models', 'Sessions', 'Settings'];
+type Tab = 'Replay' | 'Monitor' | 'Operator' | 'Paradigms' | 'Connect' | 'Compute' | 'Models' | 'Sessions' | 'Settings';
+const tabs: Tab[] = ['Replay', 'Monitor', 'Operator', 'Paradigms', 'Connect', 'Compute', 'Models', 'Sessions', 'Settings'];
 const initialBoards: Board[] = catalogBoards();
 
 const Button = ({ label, onPress, active, danger }: { label: string; onPress: () => void; active?: boolean; danger?: boolean }) => (
@@ -36,7 +37,7 @@ function SignalChart({ samples, width }: { samples: Sample[]; width: number }) {
 
 export default function App() {
   const { width } = useWindowDimensions();
-  const [tab, setTab] = useState<Tab>('Monitor');
+  const [tab, setTab] = useState<Tab>('Replay');
   const [boards, setBoards] = useState(initialBoards);
   const [connected, setConnected] = useState<Board | null>(null);
   const [streaming, setStreaming] = useState(false);
@@ -70,14 +71,14 @@ export default function App() {
 
   useEffect(() => { Promise.all([loadSessions(), loadModels()]).then(([savedSessions, savedModels]) => { setSessions(savedSessions); setModels([...BUILTIN_MODELS, ...savedModels]); }); }, []);
   useEffect(() => {
-    if (!streaming) return;
+    if (!streaming || tab === 'Replay') return;
     const timer = setInterval(() => {
       const batch = Array.from({ length: 5 }, () => syntheticSample(sampleIndex.current++, startedAt.current));
       setSamples((old) => preprocess([...old, ...batch].slice(-500), filter));
       if (recording) setRecorded((old) => [...old, ...batch]);
     }, 40);
     return () => clearInterval(timer);
-  }, [streaming, recording, filter]);
+  }, [streaming, recording, filter, tab]);
   useEffect(() => {
     const model = models.find((m) => m.id === selectedModel);
     if (model && samples.length) setScore(runModel(model, processPipeline(samples, pipeline).samples));
@@ -144,6 +145,7 @@ export default function App() {
     <View style={styles.header}><View><Text style={styles.brand}>NEUROFLOW</Text><Text style={styles.subtitle}>EEG workbench · local first</Text></View><View style={[styles.dot, connected && styles.dotOnline]} /></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.nav} contentContainerStyle={styles.navContent}>{tabs.map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.navItem, tab === item && styles.navActive]}><Text style={[styles.navText, tab === item && styles.navTextActive]}>{item}</Text></Pressable>)}</ScrollView>
     <ScrollView contentContainerStyle={styles.content}>
+      {tab === 'Replay' && <ReplayScreen />}
       {tab === 'Monitor' && <>
         <View style={styles.hero}><View><Text style={styles.eyebrow}>{connected ? connected.name : 'NO BOARD CONNECTED'}</Text><Text style={styles.big}>{streaming ? 'LIVE' : 'IDLE'}</Text></View><View><Text style={styles.score}>{Math.round(score * 100)}</Text><Text style={styles.scoreLabel}>{model?.name ?? 'Model score'}</Text></View></View>
         <Card title="Live EEG · processing output"><SignalChart samples={pipelineResult.samples} width={Math.max(280, Math.min(980, width - 60))} /><Text style={styles.meta}>{samples.length ? `${SAMPLE_RATE} Hz · ${pipelineResult.samples[0]?.channels.length ?? 0} channels · ${(pipelineResult.artifactRate * 100).toFixed(1)}% artifacts · control ${pipelineResult.control.toFixed(2)}` : 'Connect a board to begin.'}</Text></Card>
