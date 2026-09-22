@@ -1,0 +1,10 @@
+{
+  "name": "Example Channel Model",
+  "description": "Example logistic model over the latest eight-channel sample, for live scoring in the Models tab.",
+  "kind": "linear",
+  "weights": [0.02, -0.01, 0.015, 0.01, -0.02, 0.005, 0.01, -0.005],
+  "bias": 0,
+  "output": "probability",
+  "labels": ["low", "high"],
+  "threshold": 0.5
+}

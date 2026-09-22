@@ -6,12 +6,15 @@ A local-first Expo/React Native EEG workbench built as an application layer for 
 
 - Built-in high/low-pass preprocessing controls and an eight-channel synthetic EEG stream.
 - Live multi-channel EEG visualization.
-- Connection center with synthetic board and Web Serial selection in compatible desktop browsers.
+- Connection center with the BrainFlow synthetic board and Web Serial selection in compatible desktop browsers.
+- Offline analysis: replay a recorded CSV/JSON file window by window, extract features, and score every window with an uploaded model.
 - Model library, live scoring, and import of portable linear-model JSON files.
 - Browser and Android project configuration from one React Native codebase.
 - Local recording history with CSV and JSON export.
 - Local-only privacy mode. Firebase is deliberately not configured without project credentials and a user consent policy.
 - Correct separation between ADB (computer-to-Android development connection) and EEG-device discovery.
+
+Per-vendor headset adapters (Muse, BrainBit, OpenBCI) and the phone/computer inference router were removed from this build to keep the surface honest; both are recoverable from git history.
 
 ## BCI2000-inspired workbench
 
@@ -19,7 +22,7 @@ The app now follows the same broad separation of concerns as BCI2000:
 
 - **Source:** device status, sample-rate clock, streaming, recording, and synthetic-board testing.
 - **Signal processing:** channel selection, high/low-pass controls, CAR or nearest-neighbor Laplacian spatial filters, artifact rejection, classifier selection, and output normalization.
-- **Application:** 2D cursor feedback, P300 matrix-speller preview, timed motor-imagery/evoked-response stimulus presentation, and free-running feedback.
+- **Application:** offline analysis of recorded files, 2D cursor feedback, P300 matrix-speller preview, timed motor-imagery/evoked-response stimulus presentation, and free-running feedback.
 - **Operator:** configure/start/suspend lifecycle, module health, run identity, notes, timing display, and timestamped state/event log.
 - **Configuration:** portable JSON parameter import/export covering source-adjacent, processing, classifier, paradigm, subject, and run settings.
 - **Data:** signal samples, event markers, parameters, and notes are stored together in session JSON; flattened signal export is available as CSV.
@@ -46,27 +49,25 @@ The included synthetic source makes every screen testable today. Real EEG acquis
 
 The upstream SDK source supplied with this project was left unmodified in `work/brainflow-source/brainflow-master`.
 
-## Hybrid phone/computer mode
+## Analysis: upload a model, score a recording
 
-The **Compute** tab supports three routing policies: phone only, automatic fallback, and computer preferred. A dependency-free development companion is included and exposes health and inference endpoints on the local network.
+The **Analysis** tab runs the full offline path with no headset attached:
 
-Start it on the computer:
+1. Choose a recording (CSV, or JSON in the schema `src/replay.ts` validates; up to 25 MB). Convert MATLAB files with `EEGproc/convert.py`.
+2. Choose a model JSON file. The app checks up front that every feature the model names is one this recording will produce, and says which are missing if not.
+3. Start the run. Each two-second window is filtered, reduced to features, and scored. You get the per-window output plotted against the model's decision threshold, the label distribution, the output range, and the inference latency alongside the existing processing timings.
+4. Export the run as JSON (model metadata, settings, per-window features and predictions, summary) or as timing/prediction CSV.
 
-```bash
-python companion/server.py
-```
+## Model file schema
 
-Find the computer's LAN address with `ipconfig`, then enter `http://COMPUTER_IP:8765` in the app's Compute tab. Keep the phone and computer on the same private network. The included backend is an end-to-end routing test that computes a transparent signal-energy score; it is not a pretrained neural model. Replace `predict()` in `companion/server.py` with validated PyTorch/ONNX EEGNet, BIOT, LaBraM, or EEGPT inference.
+Two model shapes, both plain data — see `model.example.json` and `model.channels.example.json`:
 
-Before exposing the companion outside a trusted development network, add authenticated pairing, TLS, replay protection, payload limits, and explicit user consent. The production Android manifest will also need cleartext-local-network policy or HTTPS configuration.
+- **Feature models** declare `features`, a list of feature keys, with one weight each. Keys are `<channel>.theta_power`, `<channel>.alpha_power`, `<channel>.beta_power`, `<channel>.spectral_entropy`, and `<left>:<right>.alpha_log_asymmetry` for each configured channel pair. These run in Analysis.
+- **Channel models** omit `features` and carry one weight per EEG channel, applied to the latest sample. These run live in the Models tab.
 
-## Headset adapter layer
+Both accept `bias`, optional `standardize` (`mean`/`scale` per weight, applied before the dot product), `output` (`probability` for a logistic squash, or raw `score`), `labels` (a two-element negative/positive pair), and `threshold`.
 
-`src/headsets.ts` defines the common acquisition contract and an initial compatibility catalog for BrainFlow synthetic/streaming boards, Muse, BrainBit, OpenBCI Ganglion, and OpenBCI Cyton variants. Only the synthetic adapter is active in the Expo/browser build. The UI accurately marks physical devices as requiring the native BrainFlow Android build rather than presenting a false connection.
-
-## Imported model schema
-
-See `model.example.json`. Imported models are intentionally constrained to transparent logistic linear models (`weights`, optional `bias`) so parsing arbitrary model files cannot execute code. ONNX/TFLite support belongs in the native bridge and should validate tensor shapes before inference.
+Models are intentionally constrained to transparent linear weights so importing a file can never execute code. ONNX/TFLite support belongs in the native bridge and should validate tensor shapes before inference.
 
 ## Data and privacy
 

@@ -1,6 +1,12 @@
 export type Recording = { version: 1; sampleRate: number; channels: string[]; kind: 'raw' | 'preprocessed'; units: 'uV' | 'V'; samples: number[][] };
 export type Settings = { highpass: number; lowpass: number; hopSeconds: number; pairs: string };
-export type Timing = { window: number; endSample: number; queueMs: number; preprocessingMs: number; featureMs: number; totalMs: number; missedDeadline: boolean; inferenceMs: null; prediction: null; features: Record<string, number> };
+export type Timing = { window: number; endSample: number; queueMs: number; preprocessingMs: number; featureMs: number; totalMs: number; missedDeadline: boolean; inferenceMs: number | null; prediction: number | null; label: string | null; features: Record<string, number> };
+export const BANDS: [string, number, number][] = [['theta', 4, 8], ['alpha', 8, 13], ['beta', 13, 30]];
+/** Feature keys a run will produce, without processing a window. Used to check an uploaded model up front. */
+export function featureKeys(r: Recording, pairs: string): string[] {
+  const keys = r.channels.flatMap(channel => [...BANDS.map(([band]) => `${channel}.${band}_power`), `${channel}.spectral_entropy`]);
+  return [...keys, ...pairs.split(',').map(x => x.trim()).filter(Boolean).map(pair => `${pair}.alpha_log_asymmetry`)];
+}
 export function validateRecording(value: unknown): Recording {
   const r = value as Recording;
   if (!r || r.version !== 1 || !Number.isFinite(r.sampleRate) || r.sampleRate < 2 || r.sampleRate > 4096 ||
@@ -55,7 +61,7 @@ export function extractFeatures(rows: number[][], r: Recording, pairs: string): 
   const n = rows.length;
   const weights = Array.from({ length: n }, (_, i) => .5 - .5 * Math.cos(2 * Math.PI * i / (n - 1)));
   const norm = r.sampleRate * weights.reduce((a, b) => a + b * b, 0);
-  const bands: [string, number, number][] = [['theta', 4, 8], ['alpha', 8, 13], ['beta', 13, 30]];
+  const bands = BANDS;
   r.channels.forEach((channel, c) => {
     const mean = rows.reduce((sum, row) => sum + row[c]!, 0) / n;
     const spectrum: number[] = [];
@@ -77,8 +83,25 @@ export function extractFeatures(rows: number[][], r: Recording, pairs: string): 
   }
   return features;
 }
+function quantile(values: number[], p: number) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]! : null;
+}
 export function summarize(rows: Timing[]) {
-  const sorted = rows.map(r => r.totalMs).sort((a,b) => a-b);
-  const percentile = (p: number) => sorted.length ? sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] : null;
-  return { windows: rows.length, medianMs: percentile(.5), p95Ms: percentile(.95), missedDeadlines: rows.filter(r => r.missedDeadline).length, maxQueueMs: rows.length ? Math.max(...rows.map(r => r.queueMs)) : null };
+  const scores = rows.filter(r => r.prediction !== null).map(r => r.prediction!);
+  const labels: Record<string, number> = {};
+  for (const row of rows) if (row.label) labels[row.label] = (labels[row.label] ?? 0) + 1;
+  return {
+    windows: rows.length,
+    medianMs: quantile(rows.map(r => r.totalMs), .5),
+    p95Ms: quantile(rows.map(r => r.totalMs), .95),
+    missedDeadlines: rows.filter(r => r.missedDeadline).length,
+    maxQueueMs: rows.length ? Math.max(...rows.map(r => r.queueMs)) : null,
+    scoredWindows: scores.length,
+    medianInferenceMs: quantile(rows.filter(r => r.inferenceMs !== null).map(r => r.inferenceMs!), .5),
+    meanScore: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null,
+    minScore: scores.length ? Math.min(...scores) : null,
+    maxScore: scores.length ? Math.max(...scores) : null,
+    labelCounts: labels,
+  };
 }

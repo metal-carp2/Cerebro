@@ -1,8 +1,12 @@
 {
-  "name": "Example Calm Classifier",
-  "description": "Example logistic-regression model operating on the latest eight-channel sample.",
+  "name": "Example Alpha Lateralisation",
+  "description": "Example logistic model over frontal alpha power. Illustrates the file format; it is not a validated classifier.",
   "kind": "linear",
-  "weights": [0.02, -0.01, 0.015, 0.01, -0.02, 0.005, 0.01, -0.005],
-  "bias": 0,
-  "windowSize": 1
+  "features": ["F3.alpha_power", "F4.alpha_power", "F3:F4.alpha_log_asymmetry"],
+  "weights": [0.8, -0.8, 1.5],
+  "bias": 0.0,
+  "standardize": { "mean": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+  "output": "probability",
+  "labels": ["right-dominant", "left-dominant"],
+  "threshold": 0.5
 }
