@@ -5,10 +5,33 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "scheme": "cerebro",
+    "ios": {
+      "bundleIdentifier": "com.metalcarp2.cerebro",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Connect to the Cerebro development server on your local network.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
     "android": {
       "package": "com.neuroflow.studio",
-      "permissions": ["BLUETOOTH_SCAN", "BLUETOOTH_CONNECT", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
-    "web": { "bundler": "metro" }
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "435977a6-8128-47af-a633-2191f4c7d260"
+      }
+    },
+    "owner": "adithyab"
   }
 }
