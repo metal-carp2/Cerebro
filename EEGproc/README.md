@@ -59,3 +59,24 @@ python -m pytest EEGproc/test_dreamer_pipeline.py -q
 ```
 
 Timing is offline per-window filtering, feature extraction and optional inference wall time on the machine running the script. It excludes file loading, model loading and CSV writing; the first prediction may include tracing/startup overhead. The two-second budget flag is not a phone benchmark or proof of real-time streaming. No synthetic predictions are emitted when no model is supplied.
+
+## Arousal LSTM scoring
+
+`lstm_pipeline.py` scores DREAMER trials with `arousal_lstm_muse.keras` (input `(None, 2500, 36)`, sigmoid arousal probability). Each trial is streamed through a buffer: once 2500 samples have arrived the latest 2500 are scored, and again after every further two seconds. At 128 Hz each prediction therefore sees ~19.5 s of EEG. Windows never cross trials; trials shorter than 2500 samples produce none.
+
+```powershell
+python EEGproc/lstm_pipeline.py --mat "C:\path\to\DREAMER.mat" --model "$env:USERPROFILE\Downloads\arousal_lstm_muse.keras" --output "lstm-output"
+```
+
+**Blocked:** `build_inputs()` raises until the mapping from DREAMER's 14 channels to the model's 36 inputs (column order, filtering/resampling, frozen training scaler) comes from the model's training recipe. Tests use a clearly fake placeholder mapping.
+
+The model runs as a traced `tf.function`: about 0.2 s per window on CPU, versus ~18 s for eager Keras calls. Outputs match `dreamer_pipeline.py` (`windows.csv`, `coverage.csv`, `manifest.json`), with per-window probability and preprocessing/inference timing.
+
+To try the model on your own already-prepared inputs (rows x 36, `.npy` or `.csv`), bypassing DREAMER and `build_inputs()`:
+
+```powershell
+python EEGproc/try_model.py --model "$env:USERPROFILE\Downloads\arousal_lstm_muse.keras" --input inputs.csv
+python EEGproc/try_model.py --model "$env:USERPROFILE\Downloads\arousal_lstm_muse.keras" --random
+```
+
+`--random` feeds noise and only shows the model loads and runs. Which class an output near 1 means is not yet documented.
